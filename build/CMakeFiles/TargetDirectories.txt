@@ -1,4 +1,0 @@
-C:/Users/Mihailo/Desktop/DatyreDB/build/CMakeFiles/datyredb.dir
-C:/Users/Mihailo/Desktop/DatyreDB/build/CMakeFiles/datyredb_smoke.dir
-C:/Users/Mihailo/Desktop/DatyreDB/build/CMakeFiles/edit_cache.dir
-C:/Users/Mihailo/Desktop/DatyreDB/build/CMakeFiles/rebuild_cache.dir
