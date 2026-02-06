@@ -1,0 +1,9 @@
+{
+  "name": "datyredb",
+  "version-string": "1.1.0",
+  "dependencies": [
+    "asio",
+    "nlohmann-json",
+    "gtest"
+  ]
+}

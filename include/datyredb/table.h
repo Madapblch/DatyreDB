@@ -18,6 +18,9 @@ public:
     std::string getName() const { return name_; }
 
 private:
+    bool validate(const nlohmann::json& data); 
+    void saveToFile(const nlohmann::json& data);
+
     std::string name_;
     // Здесь позже добавим логику работы с файлом
 };

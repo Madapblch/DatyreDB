@@ -37,6 +37,10 @@ public:
     std::string toString() const {
         if (ok()) return "OK";
         return "Error (" + std::to_string(static_cast<int>(code_)) + "): " + message_;
+
+    static Status AlreadyExists(std::string_view msg) { 
+        return Status(StatusCode::ALREADY_EXISTS, msg); 
+
     }
 
 private:
