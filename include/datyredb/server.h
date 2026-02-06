@@ -1,30 +1,38 @@
 #ifndef DATYREDB_SERVER_H
 #define DATYREDB_SERVER_H
 
-#include <string>
+#include <asio.hpp>
 #include <memory>
-#include <asio.hpp> // Тебе нужно будет скачать эту библиотеку (header-only)
+#include <string>
 #include "datyredb/database.h"
+#include "datyredb/network/dispatcher.h"
 
 namespace datyredb {
 
+/**
+ * @brief Профессиональный сетевой сервер для DatyreDB.
+ * Работает на базе Asio, принимает TCP-соединения и передает их Диспетчеру.
+ */
 class Server {
 public:
-    // Конструктор принимает порт и ссылку на инициализированную базу
+    // Конструктор: связываем сервер с существующим ядром базы
     Server(uint16_t port, Database& db);
 
-    // Запуск цикла прослушивания порта
+    // Запуск бесконечного цикла прослушивания порта
     void run();
 
 private:
-    // Метод для обработки одного подключения
+    // Обработка одного входящего подключения
     void handle_client(asio::ip::tcp::socket socket);
 
     uint16_t port_;
     Database& db_;
     asio::io_context io_context_;
+    
+    // "Мозг" сервера, который знает все команды
+    CommandDispatcher dispatcher_;
 };
 
 } // namespace datyredb
 
-#endif
+#endif // DATYREDB_SERVER_H

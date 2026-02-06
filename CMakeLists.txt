@@ -1,43 +1,44 @@
 cmake_minimum_required(VERSION 3.18 FATAL_ERROR)
 project(DatyreDB 
     VERSION 1.0.0 
-    DESCRIPTION "High-performance embedded JSON DBMS"
+    DESCRIPTION "Professional Embedded & Network JSON DBMS"
     LANGUAGES CXX)
 
+# --- 1. СТАНДАРТЫ И ГЛОБАЛЬНЫЕ НАСТРОЙКИ ---
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON) # Для работы подсказок в Cursor/VSCode
 
-# --- 1. Автоматическое управление зависимостями (Modern Pro) ---
+# --- 2. АВТОМАТИЗАЦИЯ ЗАВИСИМОСТЕЙ (Modern FetchContent) ---
+# Профессионалы не качают библиотеки руками. CMake сделает это сам.
 include(FetchContent)
 
-# Автозагрузка nlohmann_json
+# Загружаем JSON (nlohmann)
 FetchContent_Declare(json URL https://github.com)
 FetchContent_MakeAvailable(json)
 
-# Автозагрузка Asio (Standalone)
+# Загружаем сетевую библиотеку Asio (Standalone)
 FetchContent_Declare(asio URL https://github.com)
 FetchContent_MakeAvailable(asio)
 
-# --- 2. Глобальные флаги компилятора ---
+# --- 3. СТРОГИЙ КОНТРОЛЬ КОДА (Warnings as Errors) ---
+# Чтобы код был чистым, мы превращаем предупреждения в ошибки
 if(MSVC)
-    add_compile_options(/W4 /WX /Zc:__cplusplus /utf-8)
+    add_compile_options(/W4 /WX /permissive- /utf-8)
 else()
     add_compile_options(-Wall -Wextra -Wpedantic -Werror -O3)
 endif()
 
-# --- 3. Определение модулей (Targets) ---
+# --- 4. МОДУЛЬНАЯ АРХИТЕКТУРА (Targets) ---
 
-# Модуль Ядра (Core)
+# Модуль Ядра (Core) - Твои Database.cpp, Table.cpp, Status.cpp
 file(GLOB_RECURSE CORE_SRC "src/core/*.cpp")
 add_library(datyredb_core STATIC ${CORE_SRC})
-target_include_directories(datyredb_core PUBLIC 
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-    $<INSTALL_INTERFACE:include>
-)
+target_include_directories(datyredb_core PUBLIC include)
 target_link_libraries(datyredb_core PRIVATE nlohmann_json::nlohmann_json)
 
-# Модуль Сети (Network)
-file(GLOB_RECURSE NET_SRC "src/network/*.cpp")
+# Модуль Сети и Команд (Network & Commands)
+file(GLOB_RECURSE NET_SRC "src/network/*.cpp" "src/network/commands/*.cpp")
 add_library(datyredb_net STATIC ${NET_SRC})
 target_link_libraries(datyredb_net 
     PUBLIC datyredb_core
@@ -45,26 +46,22 @@ target_link_libraries(datyredb_net
 )
 target_compile_definitions(datyredb_net PUBLIC ASIO_STANDALONE)
 
-# --- 4. Исполняемый серверный файл ---
+# --- 5. ГЛАВНЫЙ ИСПОЛНЯЕМЫЙ ФАЙЛ (Server) ---
 add_executable(datyredb_server src/main.cpp)
 target_link_libraries(datyredb_server PRIVATE datyredb_net)
 
+# Для многопоточности (ThreadPool) на Linux
+find_package(Threads REQUIRED)
+target_link_libraries(datyredb_server PRIVATE Threads::Threads)
+
+# Системные библиотеки Windows для сокетов
 if(WIN32)
     target_link_libraries(datyredb_server PRIVATE ws2_32 mswsock)
 endif()
 
-# --- 5. Организация структуры в IDE (Чтобы было красиво) ---
+# --- 6. ОРГАНИЗАЦИЯ (IDE Folders) ---
 set_target_properties(datyredb_core PROPERTIES FOLDER "Engine")
 set_target_properties(datyredb_net PROPERTIES FOLDER "Network")
-set_target_properties(datyredb_server PROPERTIES FOLDER "App")
+set_target_properties(datyredb_server PROPERTIES FOLDER "Apps")
 
-# --- 6. Автоматическая генерация файлов установки ---
-include(GNUInstallDirs)
-install(TARGETS datyredb_server datyredb_core datyredb_net
-    EXPORT DatyreDBTargets
-    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-)
-
-message(STATUS "DatyreDB: Ultra-Pro build system initialized.")
+message(STATUS "DatyreDB: Ultra-Pro build system ready.")
