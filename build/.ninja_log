@@ -1,0 +1,12 @@
+# ninja log v6
+18	6408	7919209912350288	CMakeFiles/datyredb.dir/src/storage/wal.cpp.obj	3520f46dbf229d75
+6437	8598	7919209976532655	CMakeFiles/datyredb_smoke.dir/src/tests/crash_recovery_smoke.cpp.obj	dcb29daf0d41eef4
+15	7388	7919209912309334	CMakeFiles/datyredb.dir/src/storage/disk_manager.cpp.obj	663e276f46475281
+17	6660	7919209912329509	CMakeFiles/datyredb.dir/src/buffer/buffer_pool.cpp.obj	be5d216f6c79cb52
+20	7703	7919209912370449	CMakeFiles/datyredb.dir/src/network/server.cpp.obj	83477106391c282a
+13	9055	7919209912299267	CMakeFiles/datyredb.dir/src/db/database.cpp.obj	98bd8a9c29e0bdbf
+6661	10546	7919209978777056	CMakeFiles/datyredb_smoke.dir/src/db/database.cpp.obj	44290e20a7bfbe80
+49	1618	7919210542051598	CMakeFiles/datyredb_smoke.dir/src/storage/wal.cpp.obj	d235921be8c4233e
+47	2099	7919210542029887	CMakeFiles/datyredb_smoke.dir/src/buffer/buffer_pool.cpp.obj	b74f0482bd3dd5ed
+45	2363	7919210542019833	CMakeFiles/datyredb_smoke.dir/src/storage/disk_manager.cpp.obj	47d1d22231aa2cb7
+2364	2531	7919210565203766	datyredb_smoke.exe	1764e2c3c6831196

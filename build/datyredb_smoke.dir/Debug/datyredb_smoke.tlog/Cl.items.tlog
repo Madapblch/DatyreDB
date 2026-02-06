@@ -1,0 +1,5 @@
+C:\Users\Mihailo\Desktop\DatyreDB\src\tests\crash_recovery_smoke.cpp;C:\Users\Mihailo\Desktop\DatyreDB\build\datyredb_smoke.dir\Debug\crash_recovery_smoke.obj
+C:\Users\Mihailo\Desktop\DatyreDB\src\db\database.cpp;C:\Users\Mihailo\Desktop\DatyreDB\build\datyredb_smoke.dir\Debug\database.obj
+C:\Users\Mihailo\Desktop\DatyreDB\src\storage\disk_manager.cpp;C:\Users\Mihailo\Desktop\DatyreDB\build\datyredb_smoke.dir\Debug\disk_manager.obj
+C:\Users\Mihailo\Desktop\DatyreDB\src\buffer\buffer_pool.cpp;C:\Users\Mihailo\Desktop\DatyreDB\build\datyredb_smoke.dir\Debug\buffer_pool.obj
+C:\Users\Mihailo\Desktop\DatyreDB\src\storage\wal.cpp;C:\Users\Mihailo\Desktop\DatyreDB\build\datyredb_smoke.dir\Debug\wal.obj
