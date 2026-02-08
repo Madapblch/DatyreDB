@@ -1,19 +1,49 @@
-buid/
-dist/
+# Build directories
+build/
+cmake-build-*/
 out/
-bin/
+.build/
 
-node_modules/
-venv/
-.venv/
-
+# IDE specific
 .vscode/
 .idea/
 *.swp
-
+*.swo
+*~
 .DS_Store
-Thumbs.db
 
+# Compiled files
+*.o
+*.a
+*.so
+*.dylib
+*.dll
+*.exe
+
+# Debug files
+*.dSYM/
+*.pdb
+core
+vgcore.*
+
+# Profiling
+*.prof
+*.gcov
+*.gcda
+*.gcno
+callgrind.out.*
+perf.data
+
+# Documentation
+docs/html/
+docs/latex/
 *.log
 
-.env
+# Test results
+Testing/
+test_results/
+*.xml
+
+# Package files
+*.tar.gz
+*.zip
