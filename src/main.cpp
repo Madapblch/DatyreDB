@@ -1,55 +1,55 @@
 #include <iostream>
-#include <filesystem>
-#include "datyredb/database.h"
-#include "datyredb/server.h"
-#include "datyredb/status.h"
+#include <string>
+#include "datyredb/sql/lexer.h"
+#include "datyredb/sql/parser.h"
 
-namespace fs = std::filesystem;
+using namespace datyredb;
 
-int main(int argc, char* argv[]) {
-    std::cout << "========================================" << std::endl;
-    std::cout << "   DatyreDB System Service v1.0.0       " << std::endl;
-    std::cout << "========================================" << std::endl;
-
-    // 1. Инициализация системных путей
-    // Профессионально: создаем рабочие папки, если их нет
-    std::string db_name = "production_db";
-    datyredb::Database db(db_name);
-
-    std::cout << "[BOOT] Initializing storage engine..." << std::endl;
-    auto initStatus = db.initialize();
+int main() {
+    std::cout << "DatyreDB v0.1.0 - Professional SQL Database\n";
+    std::cout << "Type 'exit' to quit\n\n";
     
-    if (!initStatus.ok()) {
-        std::cerr << "[FATAL] " << initStatus.toString() << std::endl;
-        return 1;
+    while (true) {
+        std::cout << "datyredb> ";
+        
+        std::string query;
+        std::getline(std::cin, query);
+        
+        if (query == "exit" || query == "quit") {
+            break;
+        }
+        
+        if (query.empty()) {
+            continue;
+        }
+        
+        try {
+            // Lexical analysis
+            sql::Lexer lexer(query);
+            auto tokens = lexer.tokenize();
+            
+            std::cout << "Tokens:\n";
+            for (const auto& token : tokens) {
+                if (token.type != sql::TokenType::END_OF_FILE) {
+                    std::cout << "  " << token.to_string() << "\n";
+                }
+            }
+            
+            // Parsing
+            sql::Parser parser(std::move(tokens));
+            auto stmt = parser.parse();
+            
+            std::cout << "\nParsed statement:\n";
+            std::cout << "  " << stmt->to_string() << "\n\n";
+            
+            // TODO: Execute statement
+            std::cout << "[Execution not yet implemented]\n\n";
+            
+        } catch (const std::exception& e) {
+            std::cerr << "Error: " << e.what() << "\n\n";
+        }
     }
-
-    // 2. Проверка функций ядра (Core Integrity Check)
-    // Здесь мы можем прогнать те самые Smoke-тесты или проверить схемы
-    std::cout << "[BOOT] Core functions validated. Storage: ./" << db_name << std::endl;
-
-    // 3. Конфигурация сервера
-    uint16_t port = 7474;
     
-    // Если в будущем добавишь аргументы командной строки (например, --port 8080)
-    if (argc > 1) {
-        // Логика парсинга аргументов
-    }
-
-    // 4. Запуск сетевого интерфейса
-    try {
-        datyredb::Server server(port, db);
-        
-        std::cout << "[READY] DatyreDB is live and healthy." << std::endl;
-        std::cout << "[INFO] Listening for TCP connections on port " << port << std::endl;
-        
-        // Запуск бесконечного цикла сервера
-        server.run(); 
-    } 
-    catch (const std::exception& e) {
-        std::cerr << "[CRITICAL] Server crash: " << e.what() << std::endl;
-        return 1;
-    }
-
+    std::cout << "Goodbye!\n";
     return 0;
 }
