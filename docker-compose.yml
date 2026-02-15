@@ -1,0 +1,128 @@
+version: '3.8'
+
+# ============================================================================
+# Networks
+# ============================================================================
+networks:
+  datyredb_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/24
+
+# ============================================================================
+# Volumes
+# ============================================================================
+volumes:
+  datyredb_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /var/lib/datyredb
+      
+  datyredb_logs:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /var/log/datyredb
+      
+  datyredb_backups:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /var/backups/datyredb
+
+# ============================================================================
+# Services
+# ============================================================================
+services:
+  datyredb:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - BUILD_DATE=${BUILD_DATE:-$(date -u +'%Y-%m-%dT%H:%M:%SZ')}
+        
+    image: datyredb:latest
+    container_name: datyredb
+    hostname: datyredb-server
+    
+    # Restart policy
+    restart: unless-stopped
+    
+    # Environment variables
+    environment:
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - DATYREDB_LOG_LEVEL=${LOG_LEVEL:-info}
+      - DATYREDB_DATA_DIR=/var/lib/datyredb
+      - DATYREDB_LOG_DIR=/var/log/datyredb
+      - DATYREDB_WORKERS=${WORKERS:-4}
+      - DATYREDB_BUFFER_POOL_SIZE=${BUFFER_POOL:-1024}
+      - TZ=${TZ:-UTC}
+    
+    # Volumes
+    volumes:
+      - datyredb_data:/var/lib/datyredb
+      - datyredb_logs:/var/log/datyredb
+      - datyredb_backups:/app/backups
+      - /etc/localtime:/etc/localtime:ro
+    
+    # Port mapping
+    ports:
+      - "${DB_PORT:-5432}:5432"    # Database port
+      - "${METRICS_PORT:-9090}:9090"  # Metrics port (future use)
+    
+    # Network
+    networks:
+      datyredb_network:
+        ipv4_address: 172.20.0.10
+    
+    # Health check
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -x DatyreDB || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+    
+    # Security options
+    security_opt:
+      - no-new-privileges:true
+      - apparmor:unconfined
+    
+    # Capabilities (drop all except needed)
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETUID
+      - SETGID
+      - DAC_OVERRIDE
+    
+    # Logging
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+        labels: "service=datyredb"
+        env: "DATYREDB_LOG_LEVEL"
+    
+    # Labels for container management
+    labels:
+      com.datyredb.version: "1.0.0"
+      com.datyredb.description: "High-Performance Database System"
+      com.datyredb.maintainer: "madapblch@github.com"

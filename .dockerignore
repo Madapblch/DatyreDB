@@ -1,0 +1,41 @@
+# Git
+.git
+.gitignore
+.github/
+
+# Build artifacts
+build/
+cmake-build-*/
+*.o
+*.so
+*.a
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+logs/
+
+# Documentation
+docs/
+*.md
+
+# Tests
+tests/
+test/
+
+# Docker
+.dockerignore
+docker-compose.override.yml
+
+# Environment
+.env.local
+.env.*.local
+
+# OS
+.DS_Store
+Thumbs.db

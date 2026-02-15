@@ -1,35 +1,33 @@
-#include "telegram_bot.hpp"
+#include "network/telegram_bot.hpp"
+
 #include <nlohmann/json.hpp>
 #include <curl/curl.h>
+
 #include <iostream>
 #include <sstream>
-#include <thread>
+#include <iomanip>
+#include <fstream>
 #include <chrono>
-#include <regex>
+#include <algorithm>
 
 using json = nlohmann::json;
 
 namespace datyredb {
 namespace network {
 
-// Callback для CURL - запись ответа в строку
+// CURL callback
 static size_t WriteCallback(void* contents, size_t size, size_t nmemb, std::string* userp) {
-    userp->append((char*)contents, size * nmemb);
+    userp->append(static_cast<char*>(contents), size * nmemb);
     return size * nmemb;
 }
 
-TelegramBot::TelegramBot(const std::string& token, database::Database* db)
+TelegramBot::TelegramBot(const std::string& token, Database* db)
     : bot_token_(token)
-    , db_(db)
-    , running_(false)
-    , update_offset_(0) {
+    , db_(db) {
     
     curl_global_init(CURL_GLOBAL_DEFAULT);
-    
-    // Инициализация команд
     init_commands();
     
-    // Проверка соединения
     if (!test_connection()) {
         throw std::runtime_error("Failed to connect to Telegram API");
     }
@@ -41,7 +39,6 @@ TelegramBot::~TelegramBot() {
 }
 
 void TelegramBot::init_commands() {
-    // Базовые команды
     commands_["/start"] = [this](const TelegramMessage& msg) {
         std::string welcome = 
             "🚀 *Добро пожаловать в DatyreDB Bot!*\n\n"
@@ -63,22 +60,15 @@ void TelegramBot::init_commands() {
             "📋 *Справка по командам:*\n\n"
             "*Основные команды:*\n"
             "`/query SELECT * FROM table` - выполнить запрос\n"
-            "`/tables` - показать все таблицы\n"
-            "`/describe table_name` - структура таблицы\n\n"
-            "*Управление данными:*\n"
-            "`/insert table_name` - добавить данные\n"
-            "`/update table_name` - обновить данные\n"
-            "`/delete table_name` - удалить данные\n\n"
+            "`/tables` - показать все таблицы\n\n"
             "*Администрирование:*\n"
             "`/status` - состояние БД\n"
             "`/stats` - подробная статистика\n"
-            "`/backup` - создать бэкап\n"
-            "`/restore` - восстановить из бэкапа\n"
-            "`/optimize` - оптимизация БД\n\n"
-            "*Примеры:*\n"
-            "`/query CREATE TABLE users (id INT, name TEXT)`\n"
-            "`/query INSERT INTO users VALUES (1, 'Alice')`\n"
-            "`/query SELECT * FROM users WHERE id = 1`";
+            "`/backup` - создать бэкап\n\n"
+            "*Примеры SQL:*\n"
+            "`/query SELECT * FROM users`\n"
+            "`/query SHOW TABLES`\n"
+            "`/query INSERT INTO users VALUES ('4', 'Dan', 'dan@test.com', '2024-01-04')`";
         
         send_message(msg.chat_id, help_text, true);
     };
@@ -90,14 +80,14 @@ void TelegramBot::init_commands() {
         }
         
         auto stats = db_->get_statistics();
-        std::stringstream ss;
-        ss << "📊 *Статус базы данных:*\n\n";
-        ss << "✅ Состояние: Активна\n";
-        ss << "📁 Таблиц: " << stats.table_count << "\n";
-        ss << "📝 Записей: " << stats.total_records << "\n";
-        ss << "💾 Размер: " << format_bytes(stats.total_size) << "\n";
-        ss << "⚡ Индексов: " << stats.index_count << "\n";
-        ss << "🕐 Uptime: " << format_duration(stats.uptime_seconds);
+        std::ostringstream ss;
+        ss << "📊 *Статус базы данных:*\n\n"
+           << "✅ Состояние: Активна\n"
+           << "📁 Таблиц: " << stats.table_count << "\n"
+           << "📝 Записей: " << stats.total_records << "\n"
+           << "💾 Размер: " << format_bytes(stats.total_size) << "\n"
+           << "⚡ Индексов: " << stats.index_count << "\n"
+           << "🕐 Uptime: " << format_duration(stats.uptime_seconds);
         
         send_message(msg.chat_id, ss.str(), true);
     };
@@ -114,7 +104,7 @@ void TelegramBot::init_commands() {
             return;
         }
         
-        std::stringstream ss;
+        std::ostringstream ss;
         ss << "📋 *Список таблиц:*\n\n";
         
         for (const auto& table : tables) {
@@ -133,8 +123,17 @@ void TelegramBot::init_commands() {
             return;
         }
         
-        // Извлекаем SQL запрос из сообщения
-        std::string query = msg.text.substr(6); // Убираем "/query "
+        // Extract SQL query
+        std::string query;
+        if (msg.text.length() > 7) {
+            query = msg.text.substr(7);
+            // Trim leading spaces
+            size_t start = query.find_first_not_of(" \t");
+            if (start != std::string::npos) {
+                query = query.substr(start);
+            }
+        }
+        
         if (query.empty()) {
             send_message(msg.chat_id, 
                 "❌ Использование: `/query SQL_ЗАПРОС`\n"
@@ -149,14 +148,19 @@ void TelegramBot::init_commands() {
             
             auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
             
-            std::stringstream ss;
-            ss << "✅ *Запрос выполнен успешно*\n";
-            ss << "⏱ Время: " << duration.count() << " мс\n\n";
+            std::ostringstream ss;
             
-            if (result.has_data()) {
-                ss << "```\n" << format_query_result(result) << "\n```";
+            if (result.success) {
+                ss << "✅ *Запрос выполнен успешно*\n"
+                   << "⏱ Время: " << duration.count() << " мс\n\n";
+                
+                if (result.has_data()) {
+                    ss << "```\n" << format_query_result(result) << "```";
+                } else {
+                    ss << "Затронуто строк: " << result.affected_rows;
+                }
             } else {
-                ss << "Затронуто строк: " << result.affected_rows();
+                ss << "❌ *Ошибка:* " << result.error_message;
             }
             
             send_message(msg.chat_id, ss.str(), true);
@@ -174,25 +178,23 @@ void TelegramBot::init_commands() {
         }
         
         auto stats = db_->get_detailed_statistics();
-        std::stringstream ss;
+        std::ostringstream ss;
         
-        ss << "📊 *Детальная статистика БД:*\n\n";
-        ss << "*Общая информация:*\n";
-        ss << "• Версия: " << stats.version << "\n";
-        ss << "• Uptime: " << format_duration(stats.uptime_seconds) << "\n\n";
-        
-        ss << "*Использование ресурсов:*\n";
-        ss << "• RAM: " << format_bytes(stats.memory_used) << " / " 
-           << format_bytes(stats.memory_total) << "\n";
-        ss << "• Диск: " << format_bytes(stats.disk_used) << " / "
-           << format_bytes(stats.disk_total) << "\n";
-        ss << "• CPU: " << stats.cpu_usage << "%\n\n";
-        
-        ss << "*Производительность:*\n";
-        ss << "• Запросов/сек: " << stats.queries_per_second << "\n";
-        ss << "• Среднее время отклика: " << stats.avg_query_time << " мс\n";
-        ss << "• Активных соединений: " << stats.active_connections << "\n";
-        ss << "• Кэш хитов: " << stats.cache_hit_ratio << "%\n";
+        ss << "📊 *Детальная статистика БД:*\n\n"
+           << "*Общая информация:*\n"
+           << "• Версия: " << stats.version << "\n"
+           << "• Uptime: " << format_duration(stats.uptime_seconds) << "\n\n"
+           << "*Использование ресурсов:*\n"
+           << "• RAM: " << format_bytes(stats.memory_used) << " / " 
+           << format_bytes(stats.memory_total) << "\n"
+           << "• Диск: " << format_bytes(stats.disk_used) << " / "
+           << format_bytes(stats.disk_total) << "\n"
+           << "• CPU: " << stats.cpu_usage << "%\n\n"
+           << "*Производительность:*\n"
+           << "• Запросов/сек: " << stats.queries_per_second << "\n"
+           << "• Среднее время: " << stats.avg_query_time << " мс\n"
+           << "• Соединений: " << stats.active_connections << "\n"
+           << "• Кэш хитов: " << stats.cache_hit_ratio << "%";
         
         send_message(msg.chat_id, ss.str(), true);
     };
@@ -208,11 +210,16 @@ void TelegramBot::init_commands() {
         try {
             std::string backup_path = db_->create_backup();
             
-            std::stringstream ss;
-            ss << "✅ *Резервная копия создана успешно!*\n\n";
-            ss << "📁 Файл: `" << backup_path << "`\n";
-            ss << "📏 Размер: " << format_bytes(get_file_size(backup_path)) << "\n";
-            ss << "🕐 Время создания: " << get_current_timestamp();
+            if (backup_path.empty()) {
+                send_message(msg.chat_id, "❌ Не удалось создать резервную копию");
+                return;
+            }
+            
+            std::ostringstream ss;
+            ss << "✅ *Резервная копия создана!*\n\n"
+               << "📁 Файл: `" << backup_path << "`\n"
+               << "📏 Размер: " << format_bytes(get_file_size(backup_path)) << "\n"
+               << "🕐 Время: " << get_current_timestamp();
             
             send_message(msg.chat_id, ss.str(), true);
             
@@ -230,11 +237,9 @@ void TelegramBot::init_commands() {
             "• Multi-threading обработка запросов\n"
             "• B-Tree индексирование\n"
             "• ACID транзакции\n"
-            "• Репликация Master-Slave\n"
-            "• Автоматическое резервное копирование\n"
             "• REST API и Telegram интеграция\n\n"
             "*Разработчик:* @madapblch\n"
-            "*GitHub:* [DatyreDB](https://github.com/Madapblch/DatyreDB)";
+            "*GitHub:* github.com/Madapblch/DatyreDB";
         
         send_message(msg.chat_id, about, true);
     };
@@ -247,16 +252,14 @@ bool TelegramBot::test_connection() {
         
         if (j["ok"].get<bool>()) {
             auto result = j["result"];
-            std::cout << "[TelegramBot] Connected as @" << result["username"].get<std::string>() 
-                      << " (ID: " << result["id"].get<int64_t>() << ")" << std::endl;
+            std::cout << "[TelegramBot] Connected as @" 
+                      << result["username"].get<std::string>() 
+                      << std::endl;
             return true;
         }
         
-        std::cerr << "[TelegramBot] Connection failed: " << j["description"].get<std::string>() << std::endl;
         return false;
-        
-    } catch (const std::exception& e) {
-        std::cerr << "[TelegramBot] Connection test failed: " << e.what() << std::endl;
+    } catch (...) {
         return false;
     }
 }
@@ -278,14 +281,13 @@ std::string TelegramBot::make_request(const std::string& method, const std::stri
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
     curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
-    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
     curl_easy_setopt(curl, CURLOPT_TIMEOUT, 30L);
     
     CURLcode res = curl_easy_perform(curl);
     curl_easy_cleanup(curl);
     
     if (res != CURLE_OK) {
-        throw std::runtime_error("CURL request failed: " + std::string(curl_easy_strerror(res)));
+        throw std::runtime_error(curl_easy_strerror(res));
     }
     
     return response;
@@ -294,39 +296,22 @@ std::string TelegramBot::make_request(const std::string& method, const std::stri
 TelegramMessage TelegramBot::parse_message(const std::string& json_str) {
     TelegramMessage message;
     
-    if (json_str.empty()) {
-        return message;
-    }
-    
     try {
         auto j = json::parse(json_str);
         
-        // Проверяем тип update
         json msg_object;
-        bool is_callback = false;
-        
         if (j.contains("message")) {
             msg_object = j["message"];
         } else if (j.contains("callback_query")) {
             msg_object = j["callback_query"];
-            is_callback = true;
-        } else if (j.contains("edited_message")) {
-            msg_object = j["edited_message"];
         } else {
             return message;
         }
         
-        // Извлекаем chat_id
-        if (is_callback && msg_object.contains("message")) {
-            if (msg_object["message"].contains("chat") && 
-                msg_object["message"]["chat"].contains("id")) {
-                message.chat_id = msg_object["message"]["chat"]["id"].get<int64_t>();
-            }
-        } else if (msg_object.contains("chat") && msg_object["chat"].contains("id")) {
+        if (msg_object.contains("chat") && msg_object["chat"].contains("id")) {
             message.chat_id = msg_object["chat"]["id"].get<int64_t>();
         }
         
-        // Извлекаем from_id и username
         if (msg_object.contains("from")) {
             auto& from = msg_object["from"];
             if (from.contains("id")) {
@@ -334,27 +319,19 @@ TelegramMessage TelegramBot::parse_message(const std::string& json_str) {
             }
             if (from.contains("username")) {
                 message.username = from["username"].get<std::string>();
-            } else if (from.contains("first_name")) {
-                message.username = from["first_name"].get<std::string>();
             }
         }
         
-        // Извлекаем текст
-        if (is_callback && msg_object.contains("data")) {
-            message.text = msg_object["data"].get<std::string>();
-        } else if (msg_object.contains("text")) {
+        if (msg_object.contains("text")) {
             message.text = msg_object["text"].get<std::string>();
         }
         
-        // Message ID
-        if (!is_callback && msg_object.contains("message_id")) {
+        if (msg_object.contains("message_id")) {
             message.message_id = msg_object["message_id"].get<int64_t>();
         }
         
-    } catch (const json::exception& e) {
-        std::cerr << "[TelegramBot] JSON parsing error: " << e.what() << std::endl;
-    } catch (const std::exception& e) {
-        std::cerr << "[TelegramBot] Unexpected error in parse_message: " << e.what() << std::endl;
+    } catch (...) {
+        // Ignore parse errors
     }
     
     return message;
@@ -367,7 +344,6 @@ void TelegramBot::send_message(int64_t chat_id, const std::string& text, bool pa
     std::string response;
     std::string url = "https://api.telegram.org/bot" + bot_token_ + "/sendMessage";
     
-    // Подготовка POST данных
     json post_data;
     post_data["chat_id"] = chat_id;
     post_data["text"] = text;
@@ -383,106 +359,83 @@ void TelegramBot::send_message(int64_t chat_id, const std::string& text, bool pa
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
     curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
-    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
     
     struct curl_slist* headers = nullptr;
     headers = curl_slist_append(headers, "Content-Type: application/json");
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
     
-    CURLcode res = curl_easy_perform(curl);
-    
-    if (res != CURLE_OK) {
-        std::cerr << "[TelegramBot] Failed to send message: " << curl_easy_strerror(res) << std::endl;
-    }
+    curl_easy_perform(curl);
     
     curl_slist_free_all(headers);
     curl_easy_cleanup(curl);
 }
 
 void TelegramBot::process_updates() {
-    std::stringstream params;
+    std::ostringstream params;
     params << "offset=" << update_offset_ << "&timeout=30";
     
     try {
         std::string response = make_request("getUpdates", params.str());
         auto j = json::parse(response);
         
-        if (!j["ok"].get<bool>()) {
-            std::cerr << "[TelegramBot] Failed to get updates: " 
-                      << j["description"].get<std::string>() << std::endl;
-            return;
-        }
+        if (!j["ok"].get<bool>()) return;
         
-        auto updates = j["result"];
-        
-        for (const auto& update : updates) {
-            // Обновляем offset
-            int update_id = update["update_id"].get<int>();
-            update_offset_ = update_id + 1;
+        for (const auto& update : j["result"]) {
+            update_offset_ = update["update_id"].get<int>() + 1;
             
-            // Парсим сообщение
             TelegramMessage msg = parse_message(update.dump());
             
             if (!msg.text.empty()) {
-                std::cout << "[TelegramBot] Message from " << msg.username 
-                          << " (" << msg.from_id << "): " << msg.text << std::endl;
-                
-                // Обрабатываем сообщение
                 handle_message(msg);
             }
         }
-        
-    } catch (const std::exception& e) {
-        std::cerr << "[TelegramBot] Error processing updates: " << e.what() << std::endl;
+    } catch (...) {
+        // Ignore errors
     }
 }
 
 void TelegramBot::handle_message(const TelegramMessage& msg) {
-    // Проверяем, является ли это командой
-    if (msg.text[0] == '/') {
-        size_t space_pos = msg.text.find(' ');
-        std::string command = (space_pos != std::string::npos) 
-            ? msg.text.substr(0, space_pos) 
-            : msg.text;
-        
-        // Ищем обработчик команды
-        auto it = commands_.find(command);
-        if (it != commands_.end()) {
-            try {
-                it->second(msg);
-            } catch (const std::exception& e) {
-                send_message(msg.chat_id, 
-                    "❌ Ошибка выполнения команды: " + std::string(e.what()));
-            }
-        } else if (command.find("/query") == 0) {
-            // Специальная обработка для /query с параметрами
-            commands_["/query"](msg);
-        } else {
-            send_message(msg.chat_id, 
-                "❓ Неизвестная команда. Используйте /help для справки.");
+    if (msg.text.empty() || msg.text[0] != '/') {
+        send_message(msg.chat_id, "💡 Используйте /help для справки");
+        return;
+    }
+    
+    // Extract command
+    std::string command = msg.text;
+    size_t space_pos = command.find(' ');
+    if (space_pos != std::string::npos) {
+        command = command.substr(0, space_pos);
+    }
+    
+    // Convert to lowercase for comparison
+    std::transform(command.begin(), command.end(), command.begin(),
+        [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    
+    auto it = commands_.find(command);
+    if (it != commands_.end()) {
+        try {
+            it->second(msg);
+        } catch (const std::exception& e) {
+            send_message(msg.chat_id, "❌ Ошибка: " + std::string(e.what()));
         }
+    } else if (command.find("/query") == 0) {
+        commands_["/query"](msg);
     } else {
-        // Не команда - можно обработать как обычный текст или SQL запрос
-        send_message(msg.chat_id, 
-            "💡 Подсказка: используйте /help чтобы увидеть доступные команды");
+        send_message(msg.chat_id, "❓ Неизвестная команда. /help для справки.");
     }
 }
 
 void TelegramBot::start() {
-    if (running_) {
-        return;
-    }
+    if (running_) return;
     
     running_ = true;
     bot_thread_ = std::thread(&TelegramBot::bot_loop, this);
     
-    std::cout << "[TelegramBot] Bot started successfully" << std::endl;
+    std::cout << "[TelegramBot] Bot started" << std::endl;
 }
 
 void TelegramBot::stop() {
-    if (!running_) {
-        return;
-    }
+    if (!running_) return;
     
     running_ = false;
     
@@ -494,19 +447,16 @@ void TelegramBot::stop() {
 }
 
 void TelegramBot::bot_loop() {
-    std::cout << "[TelegramBot] Entering bot loop..." << std::endl;
-    
     while (running_) {
         try {
             process_updates();
-        } catch (const std::exception& e) {
-            std::cerr << "[TelegramBot] Error in bot loop: " << e.what() << std::endl;
+        } catch (...) {
             std::this_thread::sleep_for(std::chrono::seconds(5));
         }
     }
 }
 
-// Вспомогательные функции форматирования
+// Static helper methods
 std::string TelegramBot::format_bytes(size_t bytes) {
     const char* units[] = {"B", "KB", "MB", "GB", "TB"};
     int unit_index = 0;
@@ -517,7 +467,7 @@ std::string TelegramBot::format_bytes(size_t bytes) {
         unit_index++;
     }
     
-    std::stringstream ss;
+    std::ostringstream ss;
     ss << std::fixed << std::setprecision(2) << size << " " << units[unit_index];
     return ss.str();
 }
@@ -528,7 +478,7 @@ std::string TelegramBot::format_duration(int seconds) {
     int minutes = (seconds % 3600) / 60;
     int secs = seconds % 60;
     
-    std::stringstream ss;
+    std::ostringstream ss;
     if (days > 0) ss << days << "д ";
     if (hours > 0) ss << hours << "ч ";
     if (minutes > 0) ss << minutes << "м ";
@@ -537,34 +487,31 @@ std::string TelegramBot::format_duration(int seconds) {
     return ss.str();
 }
 
-std::string TelegramBot::format_query_result(const database::QueryResult& result) {
-    // Простое форматирование результата запроса
-    std::stringstream ss;
+// ИСПРАВЛЕНО: result.columns и result.rows - это поля, не методы
+std::string TelegramBot::format_query_result(const QueryResult& result) {
+    std::ostringstream ss;
     
-    // Заголовки колонок
-    for (const auto& col : result.columns()) {
+    // Headers
+    for (const auto& col : result.columns) {  // БЕЗ скобок!
         ss << col << " | ";
     }
     ss << "\n";
     
-    // Строка разделитель
-    for (size_t i = 0; i < result.columns().size(); i++) {
+    // Separator
+    for (size_t i = 0; i < result.columns.size(); i++) {  // БЕЗ скобок!
         ss << "--- | ";
     }
     ss << "\n";
     
-    // Данные
-    size_t row_count = 0;
-    const size_t max_rows = 10; // Ограничение для Telegram
-    
-    for (const auto& row : result.rows()) {
-        if (row_count++ >= max_rows) {
-            ss << "\n... и ещё " << (result.rows().size() - max_rows) << " строк";
+    // Data
+    size_t count = 0;
+    for (const auto& row : result.rows) {  // БЕЗ скобок!
+        if (count++ >= 10) {
+            ss << "\n... и ещё " << (result.rows.size() - 10) << " строк";  // БЕЗ скобок!
             break;
         }
-        
-        for (const auto& value : row) {
-            ss << value << " | ";
+        for (const auto& val : row) {
+            ss << val << " | ";
         }
         ss << "\n";
     }
@@ -576,7 +523,7 @@ std::string TelegramBot::get_current_timestamp() {
     auto now = std::chrono::system_clock::now();
     auto time_t = std::chrono::system_clock::to_time_t(now);
     
-    std::stringstream ss;
+    std::ostringstream ss;
     ss << std::put_time(std::localtime(&time_t), "%Y-%m-%d %H:%M:%S");
     return ss.str();
 }
