@@ -1,8 +1,17 @@
 #pragma once
 
-#define DATYREDB_VERSION "@PROJECT_VERSION@"
-#define DATYREDB_VERSION_MAJOR @PROJECT_VERSION_MAJOR@
-#define DATYREDB_VERSION_MINOR @PROJECT_VERSION_MINOR@  
-#define DATYREDB_VERSION_PATCH @PROJECT_VERSION_PATCH@
-#define DATYREDB_BUILD_TYPE "@CMAKE_BUILD_TYPE@"
-#define DATYREDB_COMPILER "@CMAKE_CXX_COMPILER_ID@ @CMAKE_CXX_COMPILER_VERSION@"
+// Auto-generated file - do not edit manually
+
+namespace datyredb {
+
+constexpr const char* VERSION = "@PROJECT_VERSION@";
+constexpr int VERSION_MAJOR = @PROJECT_VERSION_MAJOR@;
+constexpr int VERSION_MINOR = @PROJECT_VERSION_MINOR@;
+constexpr int VERSION_PATCH = @PROJECT_VERSION_PATCH@;
+
+constexpr const char* BUILD_TIMESTAMP = "@DATYREDB_BUILD_TIMESTAMP@";
+constexpr const char* BUILD_TYPE = "@CMAKE_BUILD_TYPE@";
+constexpr const char* COMPILER_ID = "@CMAKE_CXX_COMPILER_ID@";
+constexpr const char* COMPILER_VERSION = "@CMAKE_CXX_COMPILER_VERSION@";
+
+} // namespace datyredb

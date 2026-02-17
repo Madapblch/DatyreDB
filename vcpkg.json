@@ -1,9 +1,13 @@
 {
   "name": "datyredb",
-  "version-string": "1.1.0",
+  "version": "1.0.0",
+  "description": "High-Performance Embedded Database Engine",
   "dependencies": [
-    "asio",
-    "nlohmann-json",
-    "gtest"
+    "fmt",
+    "spdlog"
+  ],
+  "test-dependencies": [
+    "gtest",
+    "benchmark"
   ]
 }

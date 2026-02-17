@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    name: ${{ matrix.os }} - ${{ matrix.build_type }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04]
+        build_type: [Debug, Release]
+        include:
+          - os: ubuntu-22.04
+            compiler: gcc-12
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y ninja-build libfmt-dev libspdlog-dev libgtest-dev
+
+    - name: Configure CMake
+      run: >
+        cmake -B build
+        -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+        -DDATYREDB_BUILD_TESTS=ON
+        -DDATYREDB_ENABLE_WERROR=ON
+
+    - name: Build
+      run: cmake --build build --config ${{ matrix.build_type }} -j4
+
+    - name: Test
+      run: ctest --test-dir build --output-on-failure -C ${{ matrix.build_type }}

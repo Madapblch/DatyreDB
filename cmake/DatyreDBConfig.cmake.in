@@ -1,0 +1,39 @@
+# ╔══════════════════════════════════════════════════════════════════════════════╗
+# ║  DatyreDBConfig.cmake - Package configuration                                ║
+# ╚══════════════════════════════════════════════════════════════════════════════╝
+
+@PACKAGE_INIT@
+
+# ==============================================================================
+# Dependencies
+# ==============================================================================
+
+include(CMakeFindDependencyMacro)
+
+find_dependency(Threads)
+
+# Optional: fmt (bundled in static library, but needed for some headers)
+find_package(fmt QUIET CONFIG)
+
+# ==============================================================================
+# Targets
+# ==============================================================================
+
+if(NOT TARGET DatyreDB::core)
+    include("${CMAKE_CURRENT_LIST_DIR}/DatyreDBTargets.cmake")
+endif()
+
+# ==============================================================================
+# Compatibility
+# ==============================================================================
+
+check_required_components(DatyreDB)
+
+# Provide old-style variables
+set(DATYREDB_INCLUDE_DIRS "@PACKAGE_CMAKE_INSTALL_INCLUDEDIR@")
+set(DATYREDB_LIBRARY_DIRS "@PACKAGE_CMAKE_INSTALL_LIBDIR@")
+set(DATYREDB_LIBRARIES DatyreDB::core)
+set(DATYREDB_VERSION "@PROJECT_VERSION@")
+set(DATYREDB_VERSION_MAJOR @DATYREDB_VERSION_MAJOR@)
+set(DATYREDB_VERSION_MINOR @DATYREDB_VERSION_MINOR@)
+set(DATYREDB_VERSION_PATCH @DATYREDB_VERSION_PATCH@)

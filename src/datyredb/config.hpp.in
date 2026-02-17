@@ -1,0 +1,127 @@
+// ╔══════════════════════════════════════════════════════════════════════════════╗
+// ║  DatyreDB - Build Configuration                                              ║
+// ║  Auto-generated file - DO NOT EDIT                                           ║
+// ╚══════════════════════════════════════════════════════════════════════════════╝
+
+#pragma once
+
+// ==============================================================================
+// Feature flags
+// ==============================================================================
+
+#cmakedefine01 DATYREDB_ENABLE_LOGGING
+#cmakedefine01 DATYREDB_ENABLE_ASSERTIONS
+#cmakedefine01 DATYREDB_ENABLE_TRACING
+#cmakedefine01 DATYREDB_HAS_SPDLOG
+
+// ==============================================================================
+// Platform detection
+// ==============================================================================
+
+#if defined(_WIN32) || defined(_WIN64)
+    #define DATYREDB_PLATFORM_WINDOWS 1
+    #define DATYREDB_PLATFORM_UNIX 0
+    #define DATYREDB_PLATFORM_APPLE 0
+    #define DATYREDB_PLATFORM_LINUX 0
+#elif defined(__APPLE__)
+    #define DATYREDB_PLATFORM_WINDOWS 0
+    #define DATYREDB_PLATFORM_UNIX 1
+    #define DATYREDB_PLATFORM_APPLE 1
+    #define DATYREDB_PLATFORM_LINUX 0
+#elif defined(__linux__)
+    #define DATYREDB_PLATFORM_WINDOWS 0
+    #define DATYREDB_PLATFORM_UNIX 1
+    #define DATYREDB_PLATFORM_APPLE 0
+    #define DATYREDB_PLATFORM_LINUX 1
+#else
+    #define DATYREDB_PLATFORM_WINDOWS 0
+    #define DATYREDB_PLATFORM_UNIX 1
+    #define DATYREDB_PLATFORM_APPLE 0
+    #define DATYREDB_PLATFORM_LINUX 0
+#endif
+
+// ==============================================================================
+// Compiler detection
+// ==============================================================================
+
+#if defined(__clang__)
+    #define DATYREDB_COMPILER_CLANG 1
+    #define DATYREDB_COMPILER_GCC 0
+    #define DATYREDB_COMPILER_MSVC 0
+#elif defined(__GNUC__)
+    #define DATYREDB_COMPILER_CLANG 0
+    #define DATYREDB_COMPILER_GCC 1
+    #define DATYREDB_COMPILER_MSVC 0
+#elif defined(_MSC_VER)
+    #define DATYREDB_COMPILER_CLANG 0
+    #define DATYREDB_COMPILER_GCC 0
+    #define DATYREDB_COMPILER_MSVC 1
+#else
+    #define DATYREDB_COMPILER_CLANG 0
+    #define DATYREDB_COMPILER_GCC 0
+    #define DATYREDB_COMPILER_MSVC 0
+#endif
+
+// ==============================================================================
+// Export macros
+// ==============================================================================
+
+#if DATYREDB_PLATFORM_WINDOWS
+    #ifdef DATYREDB_SHARED_LIBRARY
+        #ifdef DATYREDB_BUILDING_LIBRARY
+            #define DATYREDB_API __declspec(dllexport)
+        #else
+            #define DATYREDB_API __declspec(dllimport)
+        #endif
+    #else
+        #define DATYREDB_API
+    #endif
+#else
+    #if defined(__GNUC__) && __GNUC__ >= 4
+        #define DATYREDB_API __attribute__((visibility("default")))
+    #else
+        #define DATYREDB_API
+    #endif
+#endif
+
+// ==============================================================================
+// Debug macros
+// ==============================================================================
+
+#if defined(NDEBUG) && !DATYREDB_ENABLE_ASSERTIONS
+    #define DATYREDB_DEBUG 0
+#else
+    #define DATYREDB_DEBUG 1
+#endif
+
+// ==============================================================================
+// Useful macros
+// ==============================================================================
+
+#define DATYREDB_STRINGIFY_IMPL(x) #x
+#define DATYREDB_STRINGIFY(x) DATYREDB_STRINGIFY_IMPL(x)
+
+#define DATYREDB_CONCAT_IMPL(a, b) a##b
+#define DATYREDB_CONCAT(a, b) DATYREDB_CONCAT_IMPL(a, b)
+
+#define DATYREDB_UNUSED(x) (void)(x)
+
+#if DATYREDB_COMPILER_GCC || DATYREDB_COMPILER_CLANG
+    #define DATYREDB_LIKELY(x) __builtin_expect(!!(x), 1)
+    #define DATYREDB_UNLIKELY(x) __builtin_expect(!!(x), 0)
+    #define DATYREDB_UNREACHABLE() __builtin_unreachable()
+    #define DATYREDB_ALWAYS_INLINE __attribute__((always_inline)) inline
+    #define DATYREDB_NOINLINE __attribute__((noinline))
+#elif DATYREDB_COMPILER_MSVC
+    #define DATYREDB_LIKELY(x) (x)
+    #define DATYREDB_UNLIKELY(x) (x)
+    #define DATYREDB_UNREACHABLE() __assume(0)
+    #define DATYREDB_ALWAYS_INLINE __forceinline
+    #define DATYREDB_NOINLINE __declspec(noinline)
+#else
+    #define DATYREDB_LIKELY(x) (x)
+    #define DATYREDB_UNLIKELY(x) (x)
+    #define DATYREDB_UNREACHABLE() ((void)0)
+    #define DATYREDB_ALWAYS_INLINE inline
+    #define DATYREDB_NOINLINE
+#endif

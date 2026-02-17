@@ -1,10 +1,16 @@
-# Поиск основной библиотеки DatyreDB
-find_package(DatyreDB REQUIRED)
+# ╔══════════════════════════════════════════════════════════════════════════════╗
+# ║  examples/CMakeLists.txt - Example programs                                  ║
+# ╚══════════════════════════════════════════════════════════════════════════════╝
 
-# Сборка примера локального использования
-add_executable(example_embedded embedded_usage.cpp)
-target_link_libraries(example_embedded DatyreDB::core)
+datyredb_add_example(example_embedded
+    SOURCES embedded_usage.cpp
+)
 
-# Сборка примера сетевого клиента
-add_executable(example_client network_client.cpp)
-target_link_libraries(example_client DatyreDB::client)
+# Future examples:
+# datyredb_add_example(example_transactions
+#     SOURCES transactions.cpp
+# )
+# 
+# datyredb_add_example(example_concurrent
+#     SOURCES concurrent_access.cpp
+# )

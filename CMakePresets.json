@@ -1,0 +1,147 @@
+{
+    "version": 6,
+    "cmakeMinimumRequired": {
+        "major": 3,
+        "minor": 21,
+        "patch": 0
+    },
+    "configurePresets": [
+        {
+            "name": "base",
+            "hidden": true,
+            "binaryDir": "${sourceDir}/build/${presetName}",
+            "installDir": "${sourceDir}/install/${presetName}",
+            "cacheVariables": {
+                "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+            }
+        },
+        {
+            "name": "debug",
+            "displayName": "Debug",
+            "inherits": "base",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "DATYREDB_BUILD_TESTS": "ON",
+                "DATYREDB_BUILD_EXAMPLES": "ON",
+                "DATYREDB_ENABLE_WARNINGS": "ON"
+            }
+        },
+        {
+            "name": "release",
+            "displayName": "Release",
+            "inherits": "base",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "DATYREDB_BUILD_TESTS": "OFF",
+                "DATYREDB_ENABLE_LTO": "ON",
+                "DATYREDB_ENABLE_NATIVE": "ON"
+            }
+        },
+        {
+            "name": "dev",
+            "displayName": "Development",
+            "inherits": "debug",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "DATYREDB_BUILD_TESTS": "ON",
+                "DATYREDB_BUILD_EXAMPLES": "ON",
+                "DATYREDB_ENABLE_WARNINGS": "ON",
+                "DATYREDB_ENABLE_WERROR": "OFF"
+            }
+        },
+        {
+            "name": "asan",
+            "displayName": "AddressSanitizer",
+            "inherits": "debug",
+            "cacheVariables": {
+                "DATYREDB_ENABLE_ASAN": "ON"
+            }
+        },
+        {
+            "name": "tsan",
+            "displayName": "ThreadSanitizer",
+            "inherits": "debug",
+            "cacheVariables": {
+                "DATYREDB_ENABLE_TSAN": "ON"
+            }
+        },
+        {
+            "name": "ubsan",
+            "displayName": "UBSanitizer",
+            "inherits": "debug",
+            "cacheVariables": {
+                "DATYREDB_ENABLE_UBSAN": "ON"
+            }
+        },
+        {
+            "name": "coverage",
+            "displayName": "Coverage",
+            "inherits": "debug",
+            "cacheVariables": {
+                "DATYREDB_ENABLE_COVERAGE": "ON"
+            }
+        },
+        {
+            "name": "ci",
+            "displayName": "CI Build",
+            "inherits": "base",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "DATYREDB_BUILD_TESTS": "ON",
+                "DATYREDB_ENABLE_WARNINGS": "ON",
+                "DATYREDB_ENABLE_WERROR": "ON"
+            }
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "debug",
+            "configurePreset": "debug",
+            "jobs": 0
+        },
+        {
+            "name": "release",
+            "configurePreset": "release",
+            "jobs": 0
+        },
+        {
+            "name": "dev",
+            "configurePreset": "dev",
+            "jobs": 0
+        },
+        {
+            "name": "ci",
+            "configurePreset": "ci",
+            "jobs": 0
+        }
+    ],
+    "testPresets": [
+        {
+            "name": "debug",
+            "configurePreset": "debug",
+            "output": {
+                "outputOnFailure": true,
+                "shortProgress": true
+            }
+        },
+        {
+            "name": "dev",
+            "configurePreset": "dev",
+            "output": {
+                "outputOnFailure": true,
+                "verbosity": "verbose"
+            }
+        },
+        {
+            "name": "ci",
+            "configurePreset": "ci",
+            "output": {
+                "outputOnFailure": true
+            },
+            "execution": {
+                "jobs": 0,
+                "noTestsAction": "error"
+            }
+        }
+    ]
+}
