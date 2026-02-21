@@ -1,121 +1,71 @@
 #include <iostream>
-#include <string>
-#include <vector>
-#include <cstring>
-#include <algorithm>
-#include <thread>
+#include <csignal>
 #include <atomic>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <unistd.h>
-#include <arpa/inet.h>
+#include <thread>
+#include <chrono>
 
-#include <fmt/core.h>
 #include <fmt/color.h>
+#include <spdlog/spdlog.h>
 
-#include "core/engine.hpp"
+#include "core/database.hpp"
+#include "network/server.hpp"
 
-constexpr int PORT = 7432;
-constexpr int BUFFER_SIZE = 4096;
+// Глобальный флаг остановки
+std::atomic<bool> g_running{true};
 
-namespace {
+void signal_handler(int) {
+    g_running = false;
+}
 
-    void print_banner() {
-        fmt::print(fg(fmt::color::cyan) | fmt::emphasis::bold,
-            "╔════════════════════════════════════════════════╗\n"
-            "║             DatyreDB Server v1.1               ║\n"
-            "║   (Persistent AOF, Multi-threaded, C++17)      ║\n"
-            "╚════════════════════════════════════════════════╝\n\n"
-        );
-    }
-
-    void handle_client(int client_socket, datyre::DatabaseEngine& db) {
-        char buffer[BUFFER_SIZE] = {0};
-        std::string welcome = "Connected to DatyreDB (Persistent).\ndb > ";
-        send(client_socket, welcome.c_str(), welcome.length(), 0);
-
-        while (true) {
-            std::memset(buffer, 0, BUFFER_SIZE);
-            ssize_t bytes_read = read(client_socket, buffer, BUFFER_SIZE - 1);
-            if (bytes_read <= 0) break;
-
-            std::string command(buffer);
-            while (!command.empty() && std::isspace(static_cast<unsigned char>(command.back()))) {
-                command.pop_back();
-            }
-
-            if (command.empty()) {
-                send(client_socket, "db > ", 5, 0);
-                continue;
-            }
-
-            fmt::print("[CLIENT] Executing: {}\n", command);
-            std::string response;
-
-            if (command == "exit" || command == "quit") {
-                response = "Bye.\n";
-                send(client_socket, response.c_str(), response.length(), 0);
-                break;
-            } else if (command == "ping") {
-                response = "pong\n";
-            } else {
-                response = db.execute_command(command) + "\n";
-            }
-
-            response += "db > ";
-            send(client_socket, response.c_str(), response.length(), 0);
-        }
-        close(client_socket);
-        fmt::print(fg(fmt::color::yellow), "[INFO] Client disconnected.\n");
-    }
+void print_banner() {
+    fmt::print(fg(fmt::color::cyan) | fmt::emphasis::bold,
+        "╔════════════════════════════════════════════════╗\n"
+        "║             DatyreDB Server v1.0               ║\n"
+        "║   (High-Performance, Multi-threaded, NoSQL)    ║\n"
+        "╚════════════════════════════════════════════════╝\n\n"
+    );
 }
 
 int main() {
+    std::signal(SIGINT, signal_handler);
+    std::signal(SIGTERM, signal_handler);
+
     print_banner();
+    spdlog::info("Initializing DatyreDB...");
 
-    // При создании объекта db запустится recover() и загрузит данные из файла
-    fmt::print(fg(fmt::color::green), "[INIT] Initializing Database Engine...\n");
-    datyre::DatabaseEngine db;
+    try {
+        // 1. Инициализация базы данных
+        datyre::Database db;
 
-    int server_fd;
-    struct sockaddr_in address{};
-    int opt = 1;
-    socklen_t addrlen = sizeof(address);
+        // 2. Настройка сервера
+        datyre::network::ServerConfig config;
+        config.tcp_port = 7432;
+        config.max_connections = 1000;
 
-    if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
-        perror("Socket failed");
+        datyre::network::Server server(config);
+
+        // 3. Запуск
+        if (!server.start()) {
+            spdlog::critical("Failed to start server!");
+            return EXIT_FAILURE;
+        }
+
+        spdlog::info("Server is running on port {}. Press Ctrl+C to stop.", config.tcp_port);
+
+        // 4. Главный цикл (Main Loop)
+        while (g_running) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        }
+
+        // 5. Остановка
+        spdlog::info("Shutting down...");
+        server.stop();
+
+    } catch (const std::exception& e) {
+        spdlog::critical("Fatal Error: {}", e.what());
         return EXIT_FAILURE;
     }
-    if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt))) {
-        perror("setsockopt");
-        return EXIT_FAILURE;
-    }
 
-    address.sin_family = AF_INET;
-    address.sin_addr.s_addr = INADDR_ANY;
-    address.sin_port = htons(PORT);
-
-    if (bind(server_fd, reinterpret_cast<struct sockaddr*>(&address), sizeof(address)) < 0) {
-        perror("Bind failed");
-        return EXIT_FAILURE;
-    }
-    if (listen(server_fd, 5) < 0) {
-        perror("Listen failed");
-        return EXIT_FAILURE;
-    }
-
-    fmt::print(fg(fmt::color::blue), "[READY] Server listening on port {}\n", PORT);
-
-    while (true) {
-        int new_socket = accept(server_fd, reinterpret_cast<struct sockaddr*>(&address), &addrlen);
-        if (new_socket < 0) continue;
-
-        char client_ip[INET_ADDRSTRLEN];
-        inet_ntop(AF_INET, &(address.sin_addr), client_ip, INET_ADDRSTRLEN);
-        fmt::print(fg(fmt::color::green), "[INFO] Connection from {}\n", client_ip);
-
-        std::thread client_thread(handle_client, new_socket, std::ref(db));
-        client_thread.detach();
-    }
+    spdlog::info("Goodbye!");
     return EXIT_SUCCESS;
 }

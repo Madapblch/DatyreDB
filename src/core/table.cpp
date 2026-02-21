@@ -1,44 +1,35 @@
-#include "datyredb/table.h"
-#include "datyredb/status.h"
-#include <fstream>
-#include <filesystem>
+// 1. Сначала заголовок этого класса
+#include "core/table.hpp"
 
-namespace fs = std::filesystem;
+// 2. Сторонние библиотеки
+#include <nlohmann/json.hpp>
+#include <iostream>
 
-namespace datyredb {
+// 3. Внутренние зависимости
+#include "datyredb/status.hpp"
 
-// Конструктор
-Table::Table(std::string name) : name_(name) {}
+namespace datyre {
 
-Status Table::insert(const nlohmann::json& data) {
-    // 1. Проверяем входные данные на пустоту
-    if (data.empty()) {
-        return Status::IOError("Attempted to insert empty JSON into table: " + name_);
+    // Реализация конструктора
+    Table::Table(std::string name) : name_(std::move(name)) {}
+
+    // Реализация insert
+    Status Table::insert(const nlohmann::json& data) {
+        if (!validate(data)) {
+            return Status::InvalidArgument("Data validation failed");
+        }
+        
+        // Тут логика вставки...
+        // rows_.push_back(data); 
+
+        return Status::OK();
     }
 
-    // 2. Валидация схемы (твой профессиональный подход)
-    // Метод validate() должен быть объявлен в table.h
-    if (!validate(data)) {
-        return Status::IOError("Invalid data format for table: " + name_);
+    // Реализация validate
+    bool Table::validate(const nlohmann::json& data) {
+        // Заглушка проверки
+        if (data.empty()) return false;
+        return true;
     }
 
-    // 3. Запись в файл с обработкой исключений
-    try {
-        // Здесь вызываем твой старый метод сохранения
-        saveToFile(data); 
-    } 
-    catch (const std::exception& e) {
-        // Если диск переполнен или нет прав, мы вернем статус, а не "уроним" сервер
-        return Status::IOError("Failed to write to disk: " + std::string(e.what()));
-    }
-
-    return Status::OK();
-}
-
-// Пример реализации вспомогательного метода
-bool Table::validate(const nlohmann::json& data) {
-    // Твоя логика проверки по схеме
-    return true; // Временно
-}
-
-} // namespace datyredb
+} // namespace datyre

@@ -1,250 +1,128 @@
-#include "datyredb/sql/lexer.h"
-#include <cctype>
-#include <stdexcept>
+#include "sql/lexer.hpp"
+#include <algorithm>
+#include <map>
 
-namespace datyredb::sql {
+namespace datyre {
+namespace sql {
 
-// Инициализация словаря ключевых слов
-const std::unordered_map<std::string, TokenType> Lexer::keywords_ = {
-    {"SELECT", TokenType::SELECT},
-    {"FROM", TokenType::FROM},
-    {"WHERE", TokenType::WHERE},
-    {"INSERT", TokenType::INSERT},
-    {"INTO", TokenType::INTO},
-    {"VALUES", TokenType::VALUES},
-    {"UPDATE", TokenType::UPDATE},
-    {"SET", TokenType::SET},
-    {"DELETE", TokenType::DELETE},
-    {"CREATE", TokenType::CREATE},
-    {"TABLE", TokenType::TABLE},
-    {"DROP", TokenType::DROP},
-    {"INDEX", TokenType::INDEX},
-    {"AND", TokenType::AND},
-    {"OR", TokenType::OR},
-    {"NOT", TokenType::NOT}
-};
+    Lexer::Lexer(std::string input) : input_(std::move(input)) {
+        read_char();
+    }
 
-Lexer::Lexer(std::string_view source) : source_(source) {}
-
-std::vector<Token> Lexer::tokenize() {
-    std::vector<Token> tokens;
-    
-    while (!is_at_end()) {
-        skip_whitespace();
-        if (is_at_end()) break;
-        
-        start_ = current_;
-        Token token = next_token();
-        
-        if (token.type != TokenType::INVALID) {
-            tokens.push_back(std::move(token));
+    void Lexer::read_char() {
+        if (read_position_ >= input_.length()) {
+            ch_ = 0;
+        } else {
+            ch_ = input_[read_position_];
         }
+        position_ = read_position_;
+        read_position_++;
+        column_++;
     }
-    
-    tokens.emplace_back(TokenType::END_OF_FILE, "", line_, column_);
-    return tokens;
-}
 
-Token Lexer::next_token() {
-    skip_whitespace();
-    
-    if (is_at_end()) {
-        return Token(TokenType::END_OF_FILE, "", line_, column_);
-    }
-    
-    start_ = current_;
-    char c = advance();
-    
-    // Идентификаторы и ключевые слова
-    if (is_alpha(c)) {
-        return scan_identifier();
-    }
-    
-    // Числа
-    if (is_digit(c)) {
-        return scan_number();
-    }
-    
-    // Строковые литералы
-    if (c == '\'' || c == '"') {
-        return scan_string();
-    }
-    
-    // Операторы и разделители
-    switch (c) {
-        case '(': return Token(TokenType::LEFT_PAREN, "(", line_, column_ - 1);
-        case ')': return Token(TokenType::RIGHT_PAREN, ")", line_, column_ - 1);
-        case ',': return Token(TokenType::COMMA, ",", line_, column_ - 1);
-        case ';': return Token(TokenType::SEMICOLON, ";", line_, column_ - 1);
-        case '.': return Token(TokenType::DOT, ".", line_, column_ - 1);
-        case '+': return Token(TokenType::PLUS, "+", line_, column_ - 1);
-        case '-': {
-            // Проверяем комментарии --
-            if (match('-')) {
-                skip_comment();
-                return next_token();
-            }
-            return Token(TokenType::MINUS, "-", line_, column_ - 1);
+    char Lexer::peek_char() {
+        if (read_position_ >= input_.length()) {
+            return 0;
         }
-        case '*': return Token(TokenType::STAR, "*", line_, column_ - 1);
-        case '/': return Token(TokenType::SLASH, "/", line_, column_ - 1);
-        case '=': return Token(TokenType::EQUAL, "=", line_, column_ - 1);
-        case '<': {
-            if (match('=')) {
-                return Token(TokenType::LESS_EQUAL, "<=", line_, column_ - 2);
-            } else if (match('>')) {
-                return Token(TokenType::NOT_EQUAL, "<>", line_, column_ - 2);
-            }
-            return Token(TokenType::LESS, "<", line_, column_ - 1);
-        }
-        case '>': {
-            if (match('=')) {
-                return Token(TokenType::GREATER_EQUAL, ">=", line_, column_ - 2);
-            }
-            return Token(TokenType::GREATER, ">", line_, column_ - 1);
-        }
-        case '!': {
-            if (match('=')) {
-                return Token(TokenType::NOT_EQUAL, "!=", line_, column_ - 2);
-            }
-            break;
-        }
+        return input_[read_position_];
     }
-    
-    return Token(TokenType::INVALID, std::string(1, c), line_, column_ - 1);
-}
 
-Token Lexer::scan_identifier() {
-    while (is_alphanumeric(current()) || current() == '_') {
-        advance();
-    }
-    
-    std::string text(source_.substr(start_, current_ - start_));
-    
-    // Преобразуем в верхний регистр для поиска ключевого слова
-    std::string upper_text = text;
-    for (char& c : upper_text) {
-        c = std::toupper(c);
-    }
-    
-    auto it = keywords_.find(upper_text);
-    if (it != keywords_.end()) {
-        return Token(it->second, text, line_, column_ - text.length());
-    }
-    
-    return Token(TokenType::IDENTIFIER, text, line_, column_ - text.length());
-}
-
-Token Lexer::scan_number() {
-    while (is_digit(current())) {
-        advance();
-    }
-    
-    std::string text(source_.substr(start_, current_ - start_));
-    int64_t value = std::stoll(text);
-    
-    Token token(TokenType::INTEGER_LITERAL, text, line_, column_ - text.length());
-    token.value = value;
-    return token;
-}
-
-Token Lexer::scan_string() {
-    char quote = source_[start_];
-    
-    // Пропускаем открывающую кавычку
-    while (!is_at_end() && current() != quote) {
-        if (current() == '\n') {
-            line_++;
-            column_ = 0;
-        }
-        advance();
-    }
-    
-    if (is_at_end()) {
-        throw std::runtime_error("Unterminated string literal");
-    }
-    
-    // Пропускаем закрывающую кавычку
-    advance();
-    
-    // Извлекаем строку без кавычек
-    std::string value(source_.substr(start_ + 1, current_ - start_ - 2));
-    std::string lexeme(source_.substr(start_, current_ - start_));
-    
-    Token token(TokenType::STRING_LITERAL, lexeme, line_, column_ - lexeme.length());
-    token.value = value;
-    return token;
-}
-
-void Lexer::skip_whitespace() {
-    while (!is_at_end()) {
-        char c = current();
-        switch (c) {
-            case ' ':
-            case '\r':
-            case '\t':
-                advance();
-                break;
-            case '\n':
+    void Lexer::skip_whitespace() {
+        while (ch_ == ' ' || ch_ == '\t' || ch_ == '\n' || ch_ == '\r') {
+            if (ch_ == '\n') {
                 line_++;
                 column_ = 0;
-                advance();
-                break;
-            default:
-                return;
+            }
+            read_char();
         }
     }
-}
 
-void Lexer::skip_comment() {
-    // Пропускаем до конца строки
-    while (!is_at_end() && current() != '\n') {
-        advance();
+    Token Lexer::next_token() {
+        skip_whitespace();
+        Token tok;
+        tok.line = line_;
+        tok.column = column_;
+
+        switch (ch_) {
+            case '*': tok = {TokenType::ASTERISK, std::string(1, ch_), line_, column_}; break;
+            case ',': tok = {TokenType::COMMA, std::string(1, ch_), line_, column_}; break;
+            case ';': tok = {TokenType::SEMICOLON, std::string(1, ch_), line_, column_}; break;
+            case '(': tok = {TokenType::LPAREN, std::string(1, ch_), line_, column_}; break;
+            case ')': tok = {TokenType::RPAREN, std::string(1, ch_), line_, column_}; break;
+            case '=': tok = {TokenType::EQUALS, std::string(1, ch_), line_, column_}; break;
+            case 0:   tok = {TokenType::END_OF_FILE, "", line_, column_}; break;
+            case '\'':
+            case '"':
+                tok.type = TokenType::STRING_LITERAL;
+                tok.literal = read_string();
+                return tok; // read_string already advanced char
+            default:
+                if (is_letter(ch_)) {
+                    tok.literal = read_identifier();
+                    tok.type = lookup_ident(tok.literal);
+                    return tok;
+                } else if (is_digit(ch_)) {
+                    tok.type = TokenType::NUMBER;
+                    tok.literal = read_number();
+                    return tok;
+                } else {
+                    tok = {TokenType::ILLEGAL, std::string(1, ch_), line_, column_};
+                }
+        }
+        read_char();
+        return tok;
     }
-}
 
-char Lexer::current() const {
-    if (is_at_end()) return '\0';
-    return source_[current_];
-}
+    std::string Lexer::read_string() {
+        char quote = ch_;
+        read_char(); // skip opening quote
+        size_t start = position_;
+        while (ch_ != quote && ch_ != 0) {
+            read_char();
+        }
+        std::string str = input_.substr(start, position_ - start);
+        if (ch_ == quote) read_char(); // skip closing quote
+        return str;
+    }
 
-char Lexer::peek_char() const {
-    if (current_ + 1 >= source_.length()) return '\0';
-    return source_[current_ + 1];
-}
-
-char Lexer::advance() {
-    column_++;
-    return source_[current_++];
-}
-
-bool Lexer::match(char expected) {
-    if (is_at_end()) return false;
-    if (current() != expected) return false;
+    std::string Lexer::read_identifier() {
+        size_t start = position_;
+        while (is_letter(ch_) || is_digit(ch_) || ch_ == '_') {
+            read_char();
+        }
+        return input_.substr(start, position_ - start);
+    }
     
-    advance();
-    return true;
-}
+    std::string Lexer::read_number() {
+        size_t start = position_;
+        while (is_digit(ch_)) {
+            read_char();
+        }
+        return input_.substr(start, position_ - start);
+    }
 
-bool Lexer::is_at_end() const {
-    return current_ >= source_.length();
-}
+    TokenType Lexer::lookup_ident(const std::string& ident) {
+        static const std::map<std::string, TokenType> keywords = {
+            {"SELECT", TokenType::SELECT}, {"FROM", TokenType::FROM},
+            {"WHERE", TokenType::WHERE}, {"INSERT", TokenType::INSERT},
+            {"INTO", TokenType::INTO}, {"VALUES", TokenType::VALUES},
+            {"CREATE", TokenType::CREATE}, {"TABLE", TokenType::TABLE}
+        };
+        
+        std::string upper = ident;
+        std::transform(upper.begin(), upper.end(), upper.begin(), ::toupper);
 
-bool Lexer::is_alpha(char c) const {
-    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_';
-}
+        auto it = keywords.find(upper);
+        if (it != keywords.end()) return it->second;
+        return TokenType::IDENTIFIER;
+    }
 
-bool Lexer::is_digit(char c) const {
-    return c >= '0' && c <= '9';
-}
+    bool Lexer::is_letter(char c) {
+        return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_';
+    }
+    bool Lexer::is_digit(char c) {
+        return c >= '0' && c <= '9';
+    }
 
-bool Lexer::is_alphanumeric(char c) const {
-    return is_alpha(c) || is_digit(c);
 }
-
-std::string Token::to_string() const {
-    return "Token(" + std::to_string(static_cast<int>(type)) + 
-           ", '" + lexeme + "')";
 }
-
-} // namespace datyredb::sql

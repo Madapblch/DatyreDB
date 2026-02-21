@@ -41,8 +41,7 @@ void LogRecord::serialize(std::vector<char>& buffer) const {
         std::memcpy(ptr, data.data(), data.size());
     }
 }
-
-LogRecord LogRecord::deserialize(const char* buf, std::size_t size) {
+LogRecord LogRecord::deserialize(const char* buf, [[maybe_unused]] std::size_t size) {
     LogRecord rec;
     const char* ptr = buf;
     
@@ -229,6 +228,7 @@ Lsn WriteAheadLog::write_checkpoint_end(Lsn begin_lsn) {
 
 void WriteAheadLog::truncate_before(Lsn lsn) {
     std::lock_guard lock(append_mutex_);
+    (void)lsn;
     
     // Удаляем старые сегменты (упрощённая логика)
     // В production нужно отслеживать LSN в каждом сегменте

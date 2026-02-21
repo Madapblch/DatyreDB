@@ -1,41 +1,16 @@
 # Git
 .git
 .gitignore
-.github/
 
-# Build artifacts
+# Build artifacts (CMake & IDE)
 build/
-cmake-build-*/
-*.o
-*.so
-*.a
-
-# IDE
+cmake-build-debug/
+bin/
 .vscode/
 .idea/
 *.swp
-*.swo
 
-# Logs
+# Data & Logs
+data/
+*.wal
 *.log
-logs/
-
-# Documentation
-docs/
-*.md
-
-# Tests
-tests/
-test/
-
-# Docker
-.dockerignore
-docker-compose.override.yml
-
-# Environment
-.env.local
-.env.*.local
-
-# OS
-.DS_Store
-Thumbs.db
