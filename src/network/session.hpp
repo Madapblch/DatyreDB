@@ -2,8 +2,9 @@
 
 #include <memory>
 #include <string>
+#include <boost/asio.hpp>
+#include <deque>
 
-// Forward declarations для ускорения компиляции
 namespace datyre {
     class Database;
 }
@@ -11,26 +12,29 @@ namespace datyre {
 namespace datyre {
 namespace network {
 
-    class Connection; // Forward declaration
+    using boost::asio::ip::tcp;
 
-    // Наследуемся от enable_shared_from_this, чтобы безопасно передавать this в колбэки
     class Session : public std::enable_shared_from_this<Session> {
     public:
-        // Создаем сессию через фабричный метод (Best Practice для shared_from_this)
-        static std::shared_ptr<Session> create(std::shared_ptr<Connection> connection, datyre::Database& db);
+        static std::shared_ptr<Session> create(tcp::socket socket, datyre::Database& db);
 
-        Session(std::shared_ptr<Connection> connection, datyre::Database& db);
-        ~Session();
-
-        // Запуск обработки сессии
+        Session(tcp::socket socket, datyre::Database& db);
+        
         void start();
+        
+        // Исправлено: передача по значению (by value), так как внутри мы меняем строку
+        void deliver(std::string msg);
 
     private:
-        std::shared_ptr<Connection> connection_;
+        tcp::socket socket_;
         datyre::Database& db_;
+        
+        boost::asio::streambuf input_buffer_;
+        std::deque<std::string> write_msgs_;
 
-        // Метод, который будет вызван, когда придут данные
-        void on_message_received(const std::string& message);
+        void do_read();
+        void do_write();
+        void process_command(std::string command);
     };
 
 } // namespace network
