@@ -48,11 +48,9 @@ find_package(Threads REQUIRED)
 
 # --- 3. Сборка Библиотеки (Core Engine) ---
 
-# Собираем все исходники, кроме main.cpp
-file(GLOB_RECURSE LIB_SOURCES "src/*.cpp")
 list(FILTER LIB_SOURCES EXCLUDE REGEX "src/main.cpp")
-
-add_library(datyredb_lib STATIC ${LIB_SOURCES})
+add_subdirectory(src)
+add_subdirectory(tools/datyredbd)
 
 # Настройка путей для заголовков (чтобы писать #include "core/database.hpp")
 target_include_directories(datyredb_lib PUBLIC
@@ -71,8 +69,6 @@ target_link_libraries(datyredb_lib PUBLIC
 )
 
 # --- 4. Сборка Исполняемого файла (Server) ---
-
-add_executable(datyredb src/main.cpp)
 
 # Линкуем наше ядро к бинарнику
 target_link_libraries(datyredb PRIVATE datyredb_lib)
